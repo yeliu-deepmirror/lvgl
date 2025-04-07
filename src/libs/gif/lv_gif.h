@@ -53,6 +53,7 @@ lv_obj_t * lv_gif_create(lv_obj_t * parent);
  *                  2) path to a gif file (e.g. "S:/dir/anim.gif")
  */
 void lv_gif_set_src(lv_obj_t * obj, const void * src);
+void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_sdmmc);
 
 /**
  * Restart a gif animation.
