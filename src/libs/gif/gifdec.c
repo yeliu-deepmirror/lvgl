@@ -61,6 +61,18 @@ gd_open_gif_file(const char * fname)
 }
 
 gd_GIF *
+gd_open_gif_file_sdmmc(const char *fname, lv_sdmmc_drv_t* fd_sdmmc)
+{
+    gd_GIF gif_base;
+    memset(&gif_base, 0, sizeof(gif_base));
+    gif_base.fd_sdmmc = fd_sdmmc;
+
+    bool res = f_gif_open(&gif_base, fname, true);
+    if(!res) return NULL;
+    return gif_open(&gif_base);
+}
+
+gd_GIF *
 gd_open_gif_data(const void * data)
 {
     gd_GIF gif_base;
@@ -121,13 +133,13 @@ static gd_GIF * gif_open(gd_GIF * gif_base)
     if(0 == (INT_MAX - sizeof(gd_GIF) - LZW_CACHE_SIZE) / width / height / 5){
         LV_LOG_WARN("Image dimensions are too large");
         goto fail;
-    } 
+    }
     gif = lv_malloc(sizeof(gd_GIF) + 5 * width * height + LZW_CACHE_SIZE);
     #else
     if(0 == (INT_MAX - sizeof(gd_GIF)) / width / height / 5){
         LV_LOG_WARN("Image dimensions are too large");
         goto fail;
-    } 
+    }
     gif = lv_malloc(sizeof(gd_GIF) + 5 * width * height);
     #endif
     if(!gif) goto fail;
@@ -776,12 +788,15 @@ static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
     gif->data = NULL;
     gif->is_file = is_file;
 
-    if(is_file) {
-        lv_fs_res_t res = lv_fs_open(&gif->fd, path, LV_FS_MODE_RD);
-        if(res != LV_FS_RES_OK) return false;
-        else return true;
-    }
-    else {
+    if (is_file) {
+        if (gif->fd_sdmmc) {
+          return gif->fd_sdmmc->open_cb(path, LV_FS_MODE_RD);
+        } else {
+          lv_fs_res_t res = lv_fs_open(&gif->fd, path, LV_FS_MODE_RD);
+          if (res != LV_FS_RES_OK) return false;
+          else return true;
+        }
+    } else {
         gif->data = path;
         return true;
     }
@@ -790,9 +805,13 @@ static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
 static void f_gif_read(gd_GIF * gif, void * buf, size_t len)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->read_cb(buf, len);
+      } else {
         lv_fs_read(&gif->fd, buf, len, NULL);
-    }
-    else {
+      }
+    } else
+    {
         memcpy(buf, &gif->data[gif->f_rw_p], len);
         gif->f_rw_p += len;
     }
@@ -801,12 +820,16 @@ static void f_gif_read(gd_GIF * gif, void * buf, size_t len)
 static int f_gif_seek(gd_GIF * gif, size_t pos, int k)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->seek_cb(pos, k);
+        return gif->fd_sdmmc->tell_cb();
+      } else {
         lv_fs_seek(&gif->fd, pos, k);
         uint32_t x;
         lv_fs_tell(&gif->fd, &x);
         return x;
-    }
-    else {
+      }
+    } else {
         if(k == LV_FS_SEEK_CUR) gif->f_rw_p += pos;
         else if(k == LV_FS_SEEK_SET) gif->f_rw_p = pos;
         return gif->f_rw_p;
@@ -816,7 +839,11 @@ static int f_gif_seek(gd_GIF * gif, size_t pos, int k)
 static void f_gif_close(gd_GIF * gif)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->close_cb();
+      } else {
         lv_fs_close(&gif->fd);
+      }
     }
 }
 

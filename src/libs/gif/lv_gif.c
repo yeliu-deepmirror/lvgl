@@ -106,6 +106,44 @@ void lv_gif_set_src(lv_obj_t * obj, const void * src)
 
 }
 
+
+void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_sdmmc) {
+  lv_gif_t * gifobj = (lv_gif_t *) obj;
+  gd_GIF * gif = gifobj->gif;
+
+  /*Close previous gif if any*/
+  if(gif != NULL) {
+      lv_image_cache_drop(lv_image_get_src(obj));
+
+      gd_close_gif(gif);
+      gifobj->gif = NULL;
+      gifobj->imgdsc.data = NULL;
+  }
+
+  {
+    gif = gd_open_gif_file_sdmmc(src, fd_sdmmc);
+  }
+
+  gifobj->gif = gif;
+  gifobj->imgdsc.data = gif->canvas;
+  gifobj->imgdsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+  gifobj->imgdsc.header.flags = LV_IMAGE_FLAGS_MODIFIABLE;
+  gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
+  gifobj->imgdsc.header.h = gif->height;
+  gifobj->imgdsc.header.w = gif->width;
+  gifobj->imgdsc.header.stride = gif->width * 4;
+  gifobj->imgdsc.data_size = gif->width * gif->height * 4;
+
+  gifobj->last_call = lv_tick_get();
+
+  lv_image_set_src(obj, &gifobj->imgdsc);
+
+  lv_timer_resume(gifobj->timer);
+  lv_timer_reset(gifobj->timer);
+
+  next_frame_task_cb(gifobj->timer);
+}
+
 void lv_gif_restart(lv_obj_t * obj)
 {
     lv_gif_t * gifobj = (lv_gif_t *) obj;
