@@ -123,6 +123,10 @@ void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_s
   {
     gif = gd_open_gif_file_sdmmc(src, fd_sdmmc);
   }
+  if(gif == NULL) {
+      LV_LOG_WARN("Couldn't load the source");
+      return;
+  }
 
   gifobj->gif = gif;
   gifobj->imgdsc.data = gif->canvas;
