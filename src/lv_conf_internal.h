@@ -450,6 +450,17 @@
             #define LV_DRAW_SW_SUPPORT_ARGB8888     1
         #endif
     #endif
+    #ifndef LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED
+        #ifdef LV_KCONFIG_PRESENT
+            #ifdef CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED
+                #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED
+            #else
+                #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED 0
+            #endif
+        #else
+            #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED 1
+        #endif
+    #endif
     #ifndef LV_DRAW_SW_SUPPORT_L8
         #ifdef LV_KCONFIG_PRESENT
             #ifdef CONFIG_LV_DRAW_SW_SUPPORT_L8
@@ -1583,10 +1594,12 @@
 
 /** Include `lvgl_private.h` in `lvgl.h` to access internal data and functions by default */
 #ifndef LV_USE_PRIVATE_API
-    #ifdef CONFIG_LV_USE_PRIVATE_API
-        #define LV_USE_PRIVATE_API CONFIG_LV_USE_PRIVATE_API
-    #else
-        #define LV_USE_PRIVATE_API      0
+    #ifndef LV_USE_PRIVATE_API
+        #ifdef CONFIG_LV_USE_PRIVATE_API
+            #define LV_USE_PRIVATE_API CONFIG_LV_USE_PRIVATE_API
+        #else
+            #define LV_USE_PRIVATE_API  0
+        #endif
     #endif
 #endif
 
@@ -3537,8 +3550,7 @@
     #endif
 #endif
 
-/** 1: Enable freetype font manager
- *  - Requires: LV_USE_FREETYPE */
+/** 1: Enable Font manager */
 #ifndef LV_USE_FONT_MANAGER
     #ifdef CONFIG_LV_USE_FONT_MANAGER
         #define LV_USE_FONT_MANAGER CONFIG_LV_USE_FONT_MANAGER
@@ -3792,6 +3804,17 @@
             #define LV_LINUX_FBDEV_BUFFER_SIZE CONFIG_LV_LINUX_FBDEV_BUFFER_SIZE
         #else
             #define LV_LINUX_FBDEV_BUFFER_SIZE   60
+        #endif
+    #endif
+    #ifndef LV_LINUX_FBDEV_MMAP
+        #ifdef LV_KCONFIG_PRESENT
+            #ifdef CONFIG_LV_LINUX_FBDEV_MMAP
+                #define LV_LINUX_FBDEV_MMAP CONFIG_LV_LINUX_FBDEV_MMAP
+            #else
+                #define LV_LINUX_FBDEV_MMAP 0
+            #endif
+        #else
+            #define LV_LINUX_FBDEV_MMAP          1
         #endif
     #endif
 #endif
@@ -4235,6 +4258,19 @@
     #endif
 #endif
 
+/** Vector graphic demo */
+#ifndef LV_USE_DEMO_VECTOR_GRAPHIC
+    #ifdef CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC
+        #define LV_USE_DEMO_VECTOR_GRAPHIC CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC
+    #else
+        #define LV_USE_DEMO_VECTOR_GRAPHIC  0
+    #endif
+#endif
+
+/*---------------------------
+ * Demos from lvgl/lv_demos
+  ---------------------------*/
+
 /** Flex layout demo */
 #ifndef LV_USE_DEMO_FLEX_LAYOUT
     #ifdef CONFIG_LV_USE_DEMO_FLEX_LAYOUT
@@ -4268,15 +4304,6 @@
         #define LV_USE_DEMO_SCROLL CONFIG_LV_USE_DEMO_SCROLL
     #else
         #define LV_USE_DEMO_SCROLL          0
-    #endif
-#endif
-
-/** Vector graphic demo */
-#ifndef LV_USE_DEMO_VECTOR_GRAPHIC
-    #ifdef CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC
-        #define LV_USE_DEMO_VECTOR_GRAPHIC CONFIG_LV_USE_DEMO_VECTOR_GRAPHIC
-    #else
-        #define LV_USE_DEMO_VECTOR_GRAPHIC  0
     #endif
 #endif
 
