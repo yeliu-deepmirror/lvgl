@@ -670,6 +670,12 @@ read_image(gd_GIF * gif)
     return read_image_data(gif, interlace);
 }
 
+uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
+    return ((r & 0xF8) << 8) |   // 5 bits red
+           ((g & 0xFC) << 3) |   // 6 bits green
+           ((b & 0xF8) >> 3);    // 5 bits blue
+}
+
 static void
 render_frame_rect(gd_GIF * gif, uint8_t * buffer)
 {
@@ -687,10 +693,16 @@ render_frame_rect(gd_GIF * gif, uint8_t * buffer)
             index = gif->frame[(gif->fy + j) * gif->width + gif->fx + k];
             color = &gif->palette->colors[index * 3];
             if(!gif->gce.transparency || index != gif->gce.tindex) {
-                buffer[(i + k) * 4 + 0] = *(color + 2);
-                buffer[(i + k) * 4 + 1] = *(color + 1);
-                buffer[(i + k) * 4 + 2] = *(color + 0);
-                buffer[(i + k) * 4 + 3] = 0xFF;
+#if LV_COLOR_DEPTH == 16
+                uint16_t c = rgb888_to_rgb565(*(color + 0), *(color + 1), *(color + 2));
+                buffer[(i+k)*2 + 0] = c & 0xff;
+                buffer[(i+k)*2 + 1] = (c >> 8) & 0xff;
+#else
+                buffer[(i+k)*4 + 0] = *(color + 2);
+                buffer[(i+k)*4 + 1] = *(color + 1);
+                buffer[(i+k)*4 + 2] = *(color + 0);
+                buffer[(i+k)*4 + 3] = 0xFF;
+#endif
             }
         }
         i += gif->width;
@@ -717,10 +729,16 @@ dispose(gd_GIF * gif)
             int j, k;
             for(j = 0; j < gif->fh; j++) {
                 for(k = 0; k < gif->fw; k++) {
-                    gif->canvas[(i + k) * 4 + 0] = *(bgcolor + 2);
-                    gif->canvas[(i + k) * 4 + 1] = *(bgcolor + 1);
-                    gif->canvas[(i + k) * 4 + 2] = *(bgcolor + 0);
-                    gif->canvas[(i + k) * 4 + 3] = opa;
+#if LV_COLOR_DEPTH == 16
+                  uint16_t c = rgb888_to_rgb565(*(bgcolor + 0), *(bgcolor + 1), *(bgcolor + 2));
+                  gif->canvas[(i+k)*2 + 0] = c & 0xff;
+                  gif->canvas[(i+k)*2 + 1] = (c >> 8) & 0xff;
+#else
+                  gif->canvas[(i+k)*4 + 0] = *(bgcolor + 2);
+                  gif->canvas[(i+k)*4 + 1] = *(bgcolor + 1);
+                  gif->canvas[(i+k)*4 + 2] = *(bgcolor + 0);
+                  gif->canvas[(i+k)*4 + 3] = opa;
+#endif
                 }
                 i += gif->width;
             }
