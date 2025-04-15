@@ -89,12 +89,17 @@ void lv_gif_set_src(lv_obj_t * obj, const void * src)
     gifobj->imgdsc.data = gif->canvas;
     gifobj->imgdsc.header.magic = LV_IMAGE_HEADER_MAGIC;
     gifobj->imgdsc.header.flags = LV_IMAGE_FLAGS_MODIFIABLE;
-    gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
     gifobj->imgdsc.header.h = gif->height;
     gifobj->imgdsc.header.w = gif->width;
+#if LV_COLOR_DEPTH == 16
+    gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    gifobj->imgdsc.header.stride = gif->width * 2;
+    gifobj->imgdsc.data_size = gif->width * gif->height * 2;
+#else
+    gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
     gifobj->imgdsc.header.stride = gif->width * 4;
     gifobj->imgdsc.data_size = gif->width * gif->height * 4;
-
+#endif
     gifobj->last_call = lv_tick_get();
 
     lv_image_set_src(obj, &gifobj->imgdsc);
@@ -132,11 +137,17 @@ void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_s
   gifobj->imgdsc.data = gif->canvas;
   gifobj->imgdsc.header.magic = LV_IMAGE_HEADER_MAGIC;
   gifobj->imgdsc.header.flags = LV_IMAGE_FLAGS_MODIFIABLE;
-  gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
   gifobj->imgdsc.header.h = gif->height;
   gifobj->imgdsc.header.w = gif->width;
-  gifobj->imgdsc.header.stride = gif->width * 4;
-  gifobj->imgdsc.data_size = gif->width * gif->height * 4;
+#if LV_COLOR_DEPTH == 16
+    gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    gifobj->imgdsc.header.stride = gif->width * 2;
+    gifobj->imgdsc.data_size = gif->width * gif->height * 2;
+#else
+    gifobj->imgdsc.header.cf = LV_COLOR_FORMAT_ARGB8888;
+    gifobj->imgdsc.header.stride = gif->width * 4;
+    gifobj->imgdsc.data_size = gif->width * gif->height * 4;
+#endif
 
   gifobj->last_call = lv_tick_get();
 
@@ -221,7 +232,7 @@ static void lv_gif_constructor(const lv_obj_class_t * class_p, lv_obj_t * obj)
     lv_gif_t * gifobj = (lv_gif_t *) obj;
 
     gifobj->gif = NULL;
-    gifobj->timer = lv_timer_create(next_frame_task_cb, 10, obj);
+    gifobj->timer = lv_timer_create(next_frame_task_cb, 1, obj);
     lv_timer_pause(gifobj->timer);
 }
 
@@ -242,7 +253,7 @@ static void next_frame_task_cb(lv_timer_t * t)
     lv_obj_t * obj = t->user_data;
     lv_gif_t * gifobj = (lv_gif_t *) obj;
     uint32_t elaps = lv_tick_elaps(gifobj->last_call);
-    if(elaps < gifobj->gif->gce.delay * 10) return;
+    if(elaps < gifobj->gif->gce.delay) return;
 
     gifobj->last_call = lv_tick_get();
 
