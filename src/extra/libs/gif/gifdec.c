@@ -52,6 +52,17 @@ gd_open_gif_file(const char *fname)
     return gif_open(&gif_base);
 }
 
+gd_GIF *
+gd_open_gif_file_sdmmc(const char *fname, lv_sdmmc_drv_t* fd_sdmmc)
+{
+    gd_GIF gif_base;
+    memset(&gif_base, 0, sizeof(gif_base));
+    gif_base.fd_sdmmc = fd_sdmmc;
+
+    bool res = f_gif_open(&gif_base, fname, true);
+    if(!res) return NULL;
+    return gif_open(&gif_base);
+}
 
 gd_GIF *
 gd_open_gif_data(const void *data)
@@ -165,6 +176,8 @@ static gd_GIF * gif_open(gd_GIF * gif_base)
 fail:
     f_gif_close(gif_base);
 ok:
+
+    // printf("[LVGL] %d, %d opened \n", width, height);
     return gif;
 }
 
@@ -301,7 +314,11 @@ new_table(int key_size)
 {
     int key;
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
-    Table *table = lv_mem_alloc(sizeof(*table) + sizeof(Entry) * init_bulk);
+    size_t alloc_size = sizeof(Table) + sizeof(Entry) * init_bulk;
+    Table *table = lv_mem_alloc(alloc_size);
+    // if (table == NULL) {
+    //   printf("[LVGL] table create failed");
+    // }
     if (table) {
         table->bulk = init_bulk;
         table->nentries = (1 << key_size) + 2;
@@ -408,6 +425,8 @@ read_image_data(gd_GIF *gif, int interlace)
     clear = 1 << key_size;
     stop = clear + 1;
     table = new_table(key_size);
+    bool rett = table == NULL;
+    // printf("[LVGL] table create %d, %d, %d, %d\n", key_size, start, end, rett);
     key_size++;
     init_key_size = key_size;
     sub_len = shift = 0;
@@ -416,7 +435,12 @@ read_image_data(gd_GIF *gif, int interlace)
     ret = 0;
     frm_size = gif->fw*gif->fh;
     while (frm_off < frm_size) {
+        // printf("%d %d %d %d\n", key, clear, frm_off, frm_size);
         if (key == clear) {
+            int nentries;
+            nentries = (1 << (init_key_size - 1)) + 2;
+            bool ret = table == NULL;
+            // printf("%d, %d %d\n", nentries, init_key_size, ret);
             key_size = init_key_size;
             table->nentries = (1 << (key_size - 1)) + 2;
             table_is_full = 0;
@@ -632,10 +656,14 @@ static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
     gif->data = NULL;
     gif->is_file = is_file;
 
-    if(is_file) {
-        lv_fs_res_t res = lv_fs_open(&gif->fd, path, LV_FS_MODE_RD);
-        if(res != LV_FS_RES_OK) return false;
-        else return true;
+    if (is_file) {
+        if (gif->fd_sdmmc) {
+          return gif->fd_sdmmc->open_cb(path, LV_FS_MODE_RD);
+        } else {
+          lv_fs_res_t res = lv_fs_open(&gif->fd, path, LV_FS_MODE_RD);
+          if (res != LV_FS_RES_OK) return false;
+          else return true;
+        }
     } else {
         gif->data = path;
         return true;
@@ -645,7 +673,11 @@ static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
 static void f_gif_read(gd_GIF * gif, void * buf, size_t len)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->read_cb(buf, len);
+      } else {
         lv_fs_read(&gif->fd, buf, len, NULL);
+      }
     } else
     {
         memcpy(buf, &gif->data[gif->f_rw_p], len);
@@ -656,10 +688,15 @@ static void f_gif_read(gd_GIF * gif, void * buf, size_t len)
 static int f_gif_seek(gd_GIF * gif, size_t pos, int k)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->seek_cb(pos, k);
+        return gif->fd_sdmmc->tell_cb();
+      } else {
         lv_fs_seek(&gif->fd, pos, k);
         uint32_t x;
         lv_fs_tell(&gif->fd, &x);
         return x;
+      }
     } else {
         if(k == LV_FS_SEEK_CUR) gif->f_rw_p += pos;
         else if(k == LV_FS_SEEK_SET) gif->f_rw_p = pos;
@@ -670,7 +707,11 @@ static int f_gif_seek(gd_GIF * gif, size_t pos, int k)
 static void f_gif_close(gd_GIF * gif)
 {
     if(gif->is_file) {
+      if (gif->fd_sdmmc) {
+        gif->fd_sdmmc->close_cb();
+      } else {
         lv_fs_close(&gif->fd);
+      }
     }
 }
 

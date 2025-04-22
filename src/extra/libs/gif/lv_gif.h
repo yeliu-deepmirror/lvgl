@@ -40,9 +40,11 @@ extern const lv_obj_class_t lv_gif_class;
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-
+ 
+void lv_gif_close(lv_obj_t * obj);
 lv_obj_t * lv_gif_create(lv_obj_t * parent);
 void lv_gif_set_src(lv_obj_t * obj, const void * src);
+void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_sdmmc);
 void lv_gif_restart(lv_obj_t * gif);
 
 /**********************

@@ -20,6 +20,7 @@
  *      TYPEDEFS
  **********************/
 
+
 /**********************
  *  STATIC PROTOTYPES
  **********************/
@@ -52,6 +53,27 @@ lv_obj_t * lv_gif_create(lv_obj_t * parent)
     lv_obj_t * obj = lv_obj_class_create_obj(MY_CLASS, parent);
     lv_obj_class_init_obj(obj);
     return obj;
+}
+
+void lv_gif_close(lv_obj_t * obj) {
+  lv_gif_t * gifobj = (lv_gif_t *) obj;
+  /*Close previous gif if any*/
+  if (gifobj->gif) {
+      lv_img_cache_invalidate_src(&gifobj->imgdsc);
+      gd_close_gif(gifobj->gif);
+      gifobj->gif = NULL;
+      gifobj->imgdsc.data = NULL;
+  }
+  // if (gifobj->timer) {
+  //   lv_timer_del(gifobj->timer); // 删除定时器以暂停播放
+  //   gifobj->timer = NULL; // 将定时器指针置为 NULL
+  // }
+
+  // lv_gif_t * gifobj = (lv_gif_t *) obj;
+  // lv_img_cache_invalidate_src(&gifobj->imgdsc);
+  // if(gifobj->gif)
+  //     gd_close_gif(gifobj->gif);
+  // lv_timer_del(gifobj->timer);
 }
 
 void lv_gif_set_src(lv_obj_t * obj, const void * src)
@@ -92,6 +114,34 @@ void lv_gif_set_src(lv_obj_t * obj, const void * src)
 
     next_frame_task_cb(gifobj->timer);
 
+}
+
+void lv_gif_set_src_sdmmc(lv_obj_t * obj, const void * src, lv_sdmmc_drv_t* fd_sdmmc) {
+    lv_gif_t * gifobj = (lv_gif_t *) obj;
+
+    /*Close previous gif if any*/
+    if(gifobj->gif) {
+        lv_img_cache_invalidate_src(&gifobj->imgdsc);
+        gd_close_gif(gifobj->gif);
+        gifobj->gif = NULL;
+        gifobj->imgdsc.data = NULL;
+    }
+
+    gifobj->gif = gd_open_gif_file_sdmmc(src, fd_sdmmc);
+
+    gifobj->imgdsc.data = gifobj->gif->canvas;
+    gifobj->imgdsc.header.always_zero = 0;
+    gifobj->imgdsc.header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    gifobj->imgdsc.header.h = gifobj->gif->height;
+    gifobj->imgdsc.header.w = gifobj->gif->width;
+    gifobj->last_call = lv_tick_get();
+
+    lv_img_set_src(obj, &gifobj->imgdsc);
+
+    lv_timer_resume(gifobj->timer);
+    lv_timer_reset(gifobj->timer);
+
+    next_frame_task_cb(gifobj->timer);
 }
 
 void lv_gif_restart(lv_obj_t * obj)
