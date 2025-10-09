@@ -4,6 +4,9 @@
 #include "../../../misc/lv_color.h"
 #if LV_USE_GIF
 
+
+#include "esp_heap_caps.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -119,11 +122,14 @@ static gd_GIF * gif_open(gd_GIF * gif_base)
     f_gif_read(gif_base, &aspect, 1);
     /* Create gd_GIF Structure. */
 #if LV_COLOR_DEPTH == 32
-    gif = lv_mem_alloc(sizeof(gd_GIF) + 5 * width * height);
+    // gif = lv_mem_alloc(sizeof(gd_GIF) + 5 * width * height);
+    gif = (gd_GIF*)heap_caps_malloc(sizeof(gd_GIF) + 5 * width * height, MALLOC_CAP_SPIRAM);
 #elif LV_COLOR_DEPTH == 16
-    gif = lv_mem_alloc(sizeof(gd_GIF) + 4 * width * height);
+    // gif = lv_mem_alloc(sizeof(gd_GIF) + 4 * width * height);
+    gif = (gd_GIF*)heap_caps_malloc(sizeof(gd_GIF) + 4 * width * height, MALLOC_CAP_SPIRAM);
 #elif LV_COLOR_DEPTH == 8 || LV_COLOR_DEPTH == 1
-    gif = lv_mem_alloc(sizeof(gd_GIF) + 3 * width * height);
+    // gif = lv_mem_alloc(sizeof(gd_GIF) + 3 * width * height);
+    gif = (gd_GIF*)heap_caps_malloc(sizeof(gd_GIF) + 3 * width * height, MALLOC_CAP_SPIRAM);
 #endif
 
     if (!gif) goto fail;
@@ -315,7 +321,8 @@ new_table(int key_size)
     int key;
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
     size_t alloc_size = sizeof(Table) + sizeof(Entry) * init_bulk;
-    Table *table = lv_mem_alloc(alloc_size);
+    // Table *table = lv_mem_alloc(alloc_size);
+    Table *table = (Table*)heap_caps_malloc(alloc_size, MALLOC_CAP_SPIRAM);
     // if (table == NULL) {
     //   printf("[LVGL] table create failed");
     // }
@@ -329,6 +336,17 @@ new_table(int key_size)
     return table;
 }
 
+static void *psram_realloc(void *ptr, size_t old_size, size_t new_size)
+{
+    void *new_ptr = heap_caps_malloc(new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if(!new_ptr) return NULL;
+    if(ptr) {
+        memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
+        heap_caps_free(ptr);
+    }
+    return new_ptr;
+}
+
 /* Add table entry. Return value:
  *  0 on success
  *  +1 if key size must be incremented after this addition
@@ -338,8 +356,11 @@ add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
 {
     Table *table = *tablep;
     if (table->nentries == table->bulk) {
+        size_t old_size = sizeof(*table) + sizeof(Entry) * table->bulk;
         table->bulk *= 2;
-        table = lv_mem_realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
+        size_t new_size = sizeof(*table) + sizeof(Entry) * table->bulk;
+        // table = lv_mem_realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
+        table = (Table*)psram_realloc(table, old_size, new_size);
         if (!table) return -1;
         table->entries = (Entry *) &table[1];
         *tablep = table;
@@ -447,7 +468,8 @@ read_image_data(gd_GIF *gif, int interlace)
         } else if (!table_is_full) {
             ret = add_entry(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
-                lv_mem_free(table);
+                // lv_mem_free(table);
+                heap_caps_free(table);
                 return -1;
             }
             if (table->nentries == 0x1000) {
@@ -477,7 +499,8 @@ read_image_data(gd_GIF *gif, int interlace)
         if (key < table->nentries - 1 && !table_is_full)
             table->entries[table->nentries - 1].suffix = entry.suffix;
     }
-    lv_mem_free(table);
+    // lv_mem_free(table);
+    heap_caps_free(table);
     if (key == stop) f_gif_read(gif, &sub_len, 1); /* Must be zero! */
     f_gif_seek(gif, end, LV_FS_SEEK_SET);
     return 0;
@@ -647,7 +670,8 @@ void
 gd_close_gif(gd_GIF *gif)
 {
     f_gif_close(gif);
-    lv_mem_free(gif);
+    // lv_mem_free(gif);
+    heap_caps_free(gif);
 }
 
 static bool f_gif_open(gd_GIF * gif, const void * path, bool is_file)
